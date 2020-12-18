@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import Table from 'cli-table';
-import moment from 'moment';
+import moment, { Moment } from 'moment';
 import colors from 'colors';
 import { Command } from 'commander';
 import { Database } from 'traditional-chinese-calendar-database';
@@ -16,18 +16,42 @@ const program = new Command();
 program.storeOptionsAsProperties(false);
 
 program.arguments('[gregorian]');
-program.option('-f --format <format>', '公历日期的格式化方式', 'YYYY-MM');
-program.action(async (gregorian) => {
+program.option('-f --format <format>', '公历日期的格式化方式');
+program.action(async (gregorian: string) => {
   const options = program.opts();
-  const current = gregorian ? moment(gregorian, options.format) : moment();
+  let current: Moment;
+  if(gregorian) {
+    let format: string;
+    if(options.format) {
+      format = options.format;
+    } else {
+      if(gregorian.length === 1) {
+        format = 'M';
+      } else if(gregorian.length === 2) {
+        format = 'MM';
+      } else if(gregorian.length === 7) {
+        format = 'YYYY-MM';
+      } else {
+        process.stderr.write(`ERROR: unknown format ${ gregorian }\n`.red);
+        process.exit(1);
+      }
+    }
+    current = moment(gregorian, format)
+  } else {
+    current = moment();
+  }
 
-  process.stdout.write(`\n${ colors.blue(current.format('YYYY年MM月')) }\n`);
+  if(!current.isValid()) {
+    process.stderr.write(`ERROR: invalid date ${ gregorian }\n`.red);
+    process.exit(1);
+  }
+
+  process.stdout.write(`\n${ colors.bold.blue(current.format('YYYY年MM月')) }\n`);
+
   const table = new Table({
-    head: ['日', '一', '二', '三', '四', '五', '六'],
-    chars: { 'top': '═' , 'top-mid': '╤' , 'top-left': '╔' , 'top-right': '╗'
-         , 'bottom': '═' , 'bottom-mid': '╧' , 'bottom-left': '╚' , 'bottom-right': '╝'
-         , 'left': '║' , 'left-mid': '╟' , 'mid': '─' , 'mid-mid': '┼'
-         , 'right': '║' , 'right-mid': '╢' , 'middle': '│' }
+    head: ['第\\周', '周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+    colWidths: Array.from<number>({ length: 8 }).fill(8),
+    colAligns: Array.from<any>({ length: 8 }).fill('middle'),
   });
 
   const dates = [
@@ -44,17 +68,17 @@ program.action(async (gregorian) => {
     .map((_, index) => dates.slice(index * 7, (index * 7) + 7));
 
   table.push(
-    ...groups.map(group => group.map(date => {
-      const color = date.isBefore(current.clone().startOf('month'))
-                      ? 'gray' :
-                        (date.isAfter(current.clone().endOf('month'))
-                          ? 'gray' :
-                            (date.isSame(moment(), 'date') ? 'blue' : 'black')
-                        );
-      const compoundDate = database.getCompoundDate(date.toDate());
-      return `${ date.format('D号') }\n`[color] +
-             `${ compoundDate.lunarDate === 1 ? compoundDate.toString('lunarMonth') : compoundDate.toString('lunarDate') }`[color]
-    })),
+    ...groups.map(group => {
+      const _group = group.map(date => {
+        const today = date.isSame(moment(), 'date');
+        const withinRange = date.isSame(current, 'month');
+        const compoundDate = database.getCompoundDate(date.toDate());
+        const string = `${ date.format('MM/DD') }\n${ compoundDate.lunarDate === 1 ? compoundDate.toString('lunarMonth') : compoundDate.toString('lunarDate') }`;
+        const segments = string.split('\n');
+        return segments.map(segment => today ? colors.bold.blue(segment) : (!withinRange ? colors.italic.gray(segment) : segment)).join('\n');
+      });
+      return [colors.gray(group[1].format('Wo')), ..._group];
+    }),
   );
   process.stdout.write(`${ table.toString() }\n\n`);
 });
