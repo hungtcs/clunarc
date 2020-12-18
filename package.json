@@ -8,7 +8,8 @@
     "test": "tsc -noEmit"
   },
   "bin": {
-    "clunarc": "dist/clunarc.js"
+    "clunarc": "dist/clunarc.js",
+    "clunarc-month": "dist/clunarc-month.js"
   },
   "repository": {
     "type": "git",
