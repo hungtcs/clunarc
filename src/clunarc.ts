@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Table from 'cli-table';
+import Table from 'tty-table';
 import moment from 'moment';
 import colors from 'colors';
 import { Command } from 'commander';
@@ -21,17 +21,59 @@ program.version(pkg.version);
 program.command('month [month]', '按月显示', { executableFile: 'clunarc-month.js' });
 
 program.arguments('[gregorian]');
-program.option('-f --format <format>', '公历日期的格式化方式', 'YYYY-MM-DD');
-program.action(async (gregorian) => {
+program.option('-f --format <format>', '公历日期的格式化方式, 自动识别 DD/MM-DD/YYYY-MM-DD');
+program.action(async (gregorian: string) => {
   const options = program.opts();
-  const date = gregorian ? moment(gregorian, options.format) : moment();
+
+  let date: moment.Moment;
+  if(gregorian) {
+    const format = options.format;
+    if(format) {
+      date = moment(gregorian, format);
+    } else {
+      const length = gregorian.length;
+      if(length === 2) {
+        date = moment(gregorian, 'DD');
+      } else if(length === 4) {
+        date = moment(gregorian, 'M-DD');
+      } else if(length === 5) {
+        date = moment(gregorian, 'MM-DD');
+      } else if(length === 7) {
+        date = moment(gregorian, 'YY-M-DD');
+      } else if(length === 8) {
+        date = moment(gregorian, 'YY-MM-DD');
+      } else if(length === 9) {
+        date = moment(gregorian, 'YYYY-M-DD');
+      } else if(length === 10) {
+        date = moment(gregorian, 'YYYY-MM-DD');
+      } else {
+        process.stdout.write(`Invalid format\n`.red);
+        program.help();
+        process.exit(1);
+      }
+    }
+  } else {
+    date = moment();
+  }
+
+  if(!date.isValid()) {
+    process.stdout.write(`Invalid date\n`.red);
+    program.help();
+    process.exit(1);
+  }
 
   const compoundDate = database.getCompoundDate(date.year(), date.month() + 1, date.date());
 
-  const table = new Table();
-  table.push(
-    { '公历': `${ colors.blue(date.format('YYYY年MM月DD日 dddd')) }` },
-    { '农历': `${ colors.blue(compoundDate.toString('lunar')) }` }
-  );
-  process.stdout.write(`${ table.toString() }\n`);
+  const table = Table([
+    {
+      name: '公历',
+      value: `${ colors.blue(date.format('YYYY年MM月DD日 dddd')) }`,
+    },
+    {
+      name: '农历',
+      value: `${ colors.blue(compoundDate.toString('lunar')) }`,
+    },
+  ]);
+
+  process.stdout.write(`${ table.render() }\n`);
 });

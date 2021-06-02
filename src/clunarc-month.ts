@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Table from 'cli-table';
+import Table from 'tty-table';
 import moment, { Moment } from 'moment';
 import colors from 'colors';
 import { Command } from 'commander';
@@ -29,6 +29,12 @@ program.action(async (gregorian: string) => {
         format = 'M';
       } else if(gregorian.length === 2) {
         format = 'MM';
+      } else if(gregorian.length === 4) {
+        format = 'YY-M';
+      } else if(gregorian.length === 4) {
+        format = 'YY-MM';
+      } else if(gregorian.length === 6) {
+        format = 'YYYY-M';
       } else if(gregorian.length === 7) {
         format = 'YYYY-MM';
       } else {
@@ -46,13 +52,7 @@ program.action(async (gregorian: string) => {
     process.exit(1);
   }
 
-  process.stdout.write(`\n${ colors.bold.blue(current.format('YYYY年MM月')) }\n`);
-
-  const table = new Table({
-    head: ['第\\周', '周日', '周一', '周二', '周三', '周四', '周五', '周六'],
-    colWidths: Array.from<number>({ length: 8 }).fill(8),
-    colAligns: Array.from<any>({ length: 8 }).fill('middle'),
-  });
+  process.stdout.write(`  ${ colors.bold.blue(current.format('YYYY年MM月')) }`);
 
   const dates = [
     ...Array.from({ length: current.clone().startOf('month').day() })
@@ -67,8 +67,18 @@ program.action(async (gregorian: string) => {
   const groups = Array.from({ length: Math.ceil(dates.length / 7) })
     .map((_, index) => dates.slice(index * 7, (index * 7) + 7));
 
-  table.push(
-    ...groups.map(group => {
+
+  const table = Table(
+    ['第\\周', '周日', '周一', '周二', '周三', '周四', '周五', '周六'].map(value => {
+      const color = ['周六', '周日'].includes(value) ? 'red' : undefined;
+      return {
+        value,
+        width: 100,
+        color: color,
+        formatter: value => value,
+      };
+    }),
+    groups.map(group => {
       const _group = group.map(date => {
         const today = date.isSame(moment(), 'date');
         const withinRange = date.isSame(current, 'month');
@@ -80,5 +90,6 @@ program.action(async (gregorian: string) => {
       return [colors.gray(group[1].format('Wo')), ..._group];
     }),
   );
-  process.stdout.write(`${ table.toString() }\n\n`);
+
+  process.stdout.write(`${ table.render() }\n`);
 });
