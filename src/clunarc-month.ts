@@ -89,6 +89,9 @@ program.action(async (gregorian: string) => {
       });
       return [colors.gray(group[1].format('Wo')), ..._group];
     }),
+    {
+      width: '92'
+    }
   );
 
   process.stdout.write(`${ table.render() }\n`);
